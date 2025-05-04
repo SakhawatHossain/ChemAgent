@@ -1,0 +1,225 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <SoftwareSerial.h>  // For Bluetooth communication
+#include <Stepper.h>
+
+const int stepsPerRevolution = 2048;  // Number of steps per revolution for 28BYJ-48
+Stepper myStepper(stepsPerRevolution, 2, 3, 4, 5); 
+ // IN1 -> 2, IN2 -> 3, IN3 -> 4, IN4 -> 5
+ Stepper myStepper2(stepsPerRevolution, A0, A1, A2, A3);
+
+// Initialize the LCD with the I2C address (0x27 for example), 16 columns, and 2 rows
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+// Bluetooth SoftwareSerial: RX on pin 11, TX on pin 10
+SoftwareSerial BTSerial(10, 11);
+
+int selectedPump = 0;
+int pumpPins[] = {6, 7, 8}; // Relays connected to pins 6, 7, 8
+int runTime = 0;
+bool pumpSelected = false;
+
+void setup() {
+  // Initialize Serial communication for debugging
+  Serial.begin(9600);
+  BTSerial.begin(9600);  // Initialize Bluetooth communication
+ // myStepper.setSpeed(10);
+
+  lcd.init();  // Initialize the LCD
+  lcd.backlight(); // Turn on the backlight (if available)
+  lcd.setCursor(0, 0); // Set cursor to column 0, row 0
+  lcd.print("Despensing Section");
+
+  // Initialize the pump pins as OUTPUT and turn them OFF initially
+  for (int i = 0; i < 3; i++) {
+    pinMode(pumpPins[i], OUTPUT);
+    digitalWrite(pumpPins[i], HIGH); // Ensure all pumps are off (HIGH for off)
+  }
+}
+
+void loop() {
+  // Check for Bluetooth input
+  if (BTSerial.available()) {
+    char bluetoothInput = BTSerial.read(); // Read incoming Bluetooth data
+    if(bluetoothInput== 'A' || bluetoothInput=='B' ||bluetoothInput=='C' ||bluetoothInput=='M' ){pattern(bluetoothInput);}
+    else {handleBluetoothInput(bluetoothInput); } // Handle the Bluetooth input
+  }
+  clearSerialBuffer();
+}
+void clearSerialBuffer() {
+  while (Serial.available() > 0) {
+    Serial.read();
+  }
+}
+void pattern(char k){
+   if (k == 'A') {   // H2SO4
+   Serial.println("A");
+    lcd.setCursor(0, 0);
+    lcd.print("Solution:H2SO4          ");
+
+    lcd.setCursor(0, 1);
+    lcd.print("H: 2ml               ");
+    digitalWrite(pumpPins[0], LOW);  // LOW turns the pump ON
+    delay(2 * 1000);  // Run for the specified time in seconds
+    digitalWrite(pumpPins[0], HIGH);  // HIGH turns the pump OFF
+
+    lcd.setCursor(0, 1);
+    lcd.print("S: 1ml               ");
+    digitalWrite(pumpPins[2], LOW);  // LOW turns the pump ON
+    delay(1 * 1000);  // Run for the specified time in seconds
+    digitalWrite(pumpPins[2], HIGH);  // HIGH turns the pump OFF
+
+    lcd.setCursor(0, 1);
+    lcd.print("O: .5ml               ");
+    digitalWrite(pumpPins[1], LOW);  // LOW turns the pump ON
+    delay(.5 * 1000);  // Run for the specified time in seconds
+    digitalWrite(pumpPins[1], HIGH);  // HIGH turns the pump OFF
+
+
+  }
+  else   if (k == 'C') {   // SO2
+  Serial.println("B");
+    lcd.setCursor(0, 0);
+    lcd.print("Solution:SO2           ");
+
+    lcd.setCursor(0, 1);
+    lcd.print("S: .5ml               ");
+    digitalWrite(pumpPins[2], LOW);  // LOW turns the pump ON
+    delay(.5 * 1000);  // Run for the specified time in seconds
+    digitalWrite(pumpPins[2], HIGH);  // HIGH turns the pump OFF
+
+    lcd.setCursor(0, 1);
+    lcd.print("O: 3ml               ");
+    digitalWrite(pumpPins[1], LOW);  // LOW turns the pump ON
+    delay(3 * 1000);  // Run for the specified time in seconds
+    digitalWrite(pumpPins[1], HIGH);  // HIGH turns the pump OFF
+
+
+  }
+  else   if (k == 'B') {   // H2S
+  Serial.println("C.");
+    lcd.setCursor(0, 0);
+    lcd.print("Solution:H2S             ");
+
+    lcd.setCursor(0, 1);
+    lcd.print("H: 2ml                 ");
+    digitalWrite(pumpPins[0], LOW);  // LOW turns the pump ON
+    delay(2 * 1000);  // Run for the specified time in seconds
+    digitalWrite(pumpPins[0], HIGH);  // HIGH turns the pump OFF
+
+    lcd.setCursor(0, 1);
+    lcd.print("S: 2ml                 ");
+    digitalWrite(pumpPins[2], LOW);  // LOW turns the pump ON
+    delay(2 * 1000);  // Run for the specified time in seconds
+    digitalWrite(pumpPins[2], HIGH);  // HIGH turns the pump OFF
+  }   
+ 
+  else if (k == 'M') {    //mix
+
+    lcd.setCursor(0, 0);
+    lcd.print("Mixing Section!                   ");
+    lcd.setCursor(0, 1);
+    lcd.print("                              ");   
+
+mix1();
+mix2();
+mix3();
+  // Step one revolution in one direction:
+  //Serial.println("Clockwise");
+  //myStepper.step(stepsPerRevolution);
+  //delay(1000);
+
+  // Step one revolution in the other direction:
+ // Serial.println("Counterclockwise");
+  //myStepper.step(-stepsPerRevolution);
+  delay(1000);
+  }
+
+    lcd.setCursor(0, 0);
+    lcd.print("Choose pump!                  ");
+    lcd.setCursor(0, 1);
+    lcd.print("                              ");  
+
+}
+
+void handleBluetoothInput(char input) {
+  if (!pumpSelected && (input == '1' || input == '2' || input == '3')) {
+    // Select pump
+    selectedPump = input - '0';  // Convert '1', '2', '3' to integers
+    pumpSelected = true;
+
+    lcd.setCursor(0, 0);
+    if(input=='1'){Serial.print("Hydrogen ");   lcd.print("Selected: H                  ");}
+    if(input=='2'){Serial.print("Oxygen ");   lcd.print("Selected: O                     ");}
+    if(input=='2'){Serial.print("Sulfur ");   lcd.print("Selected: S                     ");}
+   // Serial.print(selectedPump);
+    Serial.println("selected.");
+ 
+  //  lcd.print(selectedPump);
+    lcd.setCursor(0, 1);
+    lcd.print("Set Volume(1-9)");
+  } 
+  else if (pumpSelected && (input >= '1' && input <= '9')) {
+    // Set run time and run the pump
+    runTime = input - '0';  // Convert '1'-'9' to integer for seconds
+    Serial.print("Running pump ");
+    Serial.print(selectedPump);
+    Serial.print(" for ");
+    Serial.print(runTime);
+    Serial.println(" ml");
+
+    lcd.setCursor(0, 1);
+    String message = "Despense: " + String(runTime) + "ml                ";
+    lcd.print(message);
+
+    // Turn ON the selected pump
+    digitalWrite(pumpPins[selectedPump - 1], LOW);  // LOW turns the pump ON
+    delay(runTime * 1000);  // Run for the specified time in seconds
+    digitalWrite(pumpPins[selectedPump - 1], HIGH);  // HIGH turns the pump OFF
+
+    // Reset the system after the pump has run
+    pumpSelected = false;
+    selectedPump = 0;
+    runTime = 0;
+
+    lcd.setCursor(0, 0);
+    lcd.print("Choose pump!                  ");
+    lcd.setCursor(0, 1);
+    lcd.print("                              ");
+  }
+ 
+}
+
+void mix1(){
+    myStepper.setSpeed(15);  // Set speed to 15 RPM
+
+  // Calculate steps for 15 seconds
+  int stepsForFifteenSeconds = (15 * stepsPerRevolution / 60) * 4;
+
+  // Rotate forward for 15 seconds
+  myStepper.step(stepsForFifteenSeconds);
+
+  delay(500);  // Pause for 1 second
+
+}
+
+void mix2(){
+    myStepper2.setSpeed(15);  // Set speed to 15 RPM
+
+  // Calculate steps for 15 seconds
+  int stepsForFifteenSeconds = (15 * stepsPerRevolution / 60) * 8;
+
+  myStepper2.step(stepsForFifteenSeconds);
+
+}
+void mix3(){
+    myStepper.setSpeed(15);  // Set speed to 15 RPM
+
+  // Calculate steps for 15 seconds
+  int stepsForFifteenSeconds = (15 * stepsPerRevolution / 60) * 4;
+
+
+  // Rotate backward for 15 seconds
+  myStepper.step(-stepsForFifteenSeconds);
+
+}
